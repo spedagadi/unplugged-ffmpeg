@@ -74,6 +74,7 @@ struct decklink_cctx {
     int64_t timestamp_align;
     int timing_offset;
     int wait_for_tc;
+    int no_audio;
     DecklinkSignalLossAction signal_loss_action;
 };
 

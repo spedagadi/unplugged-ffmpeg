@@ -46,6 +46,7 @@ static const AVOption options[] = {
     { "standard",     NULL,                                           0,  AV_OPT_TYPE_CONST, { .i64 = 0x7fff9fffeLL}, 0, 0,    DEC, .unit = "teletext_lines"},
     { "all",          NULL,                                           0,  AV_OPT_TYPE_CONST, { .i64 = 0x7ffffffffLL}, 0, 0,    DEC, .unit = "teletext_lines"},
     { "channels",     "number of audio channels", OFFSET(audio_channels), AV_OPT_TYPE_INT , { .i64 = 2   }, 2, 16, DEC },
+    { "no_audio",     "disable audio capture (HDMI audio is routed to AVR separately)", OFFSET(no_audio), AV_OPT_TYPE_INT, { .i64 = 0 }, 0, 1, DEC },
 #if BLACKMAGIC_DECKLINK_API_VERSION >= 0x0b000000
     { "duplex_mode",  "duplex mode",              OFFSET(duplex_mode),    AV_OPT_TYPE_INT,   { .i64 = 0}, 0, 5,    DEC, .unit = "duplex_mode"},
 #else

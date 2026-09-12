@@ -987,8 +987,8 @@ HRESULT decklink_input_callback::VideoInputFrameArrived(
         }
     }
 
-    // Handle Audio Frame
-    if (audioFrame) {
+    // Handle Audio Frame (skipped entirely when no_audio: ctx->audio_st is NULL)
+    if (audioFrame && ctx->audio_st) {
         AVPacket pkt = { 0 };
         BMDTimeValue audio_pts;
 
@@ -1234,18 +1234,26 @@ av_cold int ff_decklink_read_header(AVFormatContext *avctx)
 #endif
 
     /* Setup streams. */
-    st = avformat_new_stream(avctx, NULL);
-    if (!st) {
-        av_log(avctx, AV_LOG_ERROR, "Cannot add stream\n");
-        ret = AVERROR(ENOMEM);
-        goto error;
+    if (cctx->no_audio) {
+        /* Video-only capture: HDMI audio is routed to the AVR separately, so
+         * we do not create an audio stream, enable audio input, or emit audio
+         * packets (all three are gated on ctx->audio_st != NULL). */
+        ctx->audio_st = NULL;
+        av_log(avctx, AV_LOG_INFO, "no_audio: video-only capture (HDMI audio handled externally)\n");
+    } else {
+        st = avformat_new_stream(avctx, NULL);
+        if (!st) {
+            av_log(avctx, AV_LOG_ERROR, "Cannot add stream\n");
+            ret = AVERROR(ENOMEM);
+            goto error;
+        }
+        st->codecpar->codec_type  = AVMEDIA_TYPE_AUDIO;
+        st->codecpar->codec_id    = cctx->audio_depth == 32 ? AV_CODEC_ID_PCM_S32LE : AV_CODEC_ID_PCM_S16LE;
+        st->codecpar->sample_rate = bmdAudioSampleRate48kHz;
+        st->codecpar->ch_layout.nb_channels = cctx->audio_channels;
+        avpriv_set_pts_info(st, 64, 1, 1000000);  /* 64 bits pts in us */
+        ctx->audio_st=st;
     }
-    st->codecpar->codec_type  = AVMEDIA_TYPE_AUDIO;
-    st->codecpar->codec_id    = cctx->audio_depth == 32 ? AV_CODEC_ID_PCM_S32LE : AV_CODEC_ID_PCM_S16LE;
-    st->codecpar->sample_rate = bmdAudioSampleRate48kHz;
-    st->codecpar->ch_layout.nb_channels = cctx->audio_channels;
-    avpriv_set_pts_info(st, 64, 1, 1000000);  /* 64 bits pts in us */
-    ctx->audio_st=st;
 
     st = avformat_new_stream(avctx, NULL);
     if (!st) {
@@ -1339,13 +1347,15 @@ av_cold int ff_decklink_read_header(AVFormatContext *avctx)
         ctx->teletext_st = st;
     }
 
-    av_log(avctx, AV_LOG_VERBOSE, "Using %d input audio channels\n", ctx->audio_st->codecpar->ch_layout.nb_channels);
-    result = ctx->dli->EnableAudioInput(bmdAudioSampleRate48kHz, cctx->audio_depth == 32 ? bmdAudioSampleType32bitInteger : bmdAudioSampleType16bitInteger, ctx->audio_st->codecpar->ch_layout.nb_channels);
+    if (!cctx->no_audio && ctx->audio_st) {
+        av_log(avctx, AV_LOG_VERBOSE, "Using %d input audio channels\n", ctx->audio_st->codecpar->ch_layout.nb_channels);
+        result = ctx->dli->EnableAudioInput(bmdAudioSampleRate48kHz, cctx->audio_depth == 32 ? bmdAudioSampleType32bitInteger : bmdAudioSampleType16bitInteger, ctx->audio_st->codecpar->ch_layout.nb_channels);
 
-    if (result != S_OK) {
-        av_log(avctx, AV_LOG_ERROR, "Cannot enable audio input\n");
-        ret = AVERROR(EIO);
-        goto error;
+        if (result != S_OK) {
+            av_log(avctx, AV_LOG_ERROR, "Cannot enable audio input\n");
+            ret = AVERROR(EIO);
+            goto error;
+        }
     }
 
     result = ctx->dli->EnableVideoInput(ctx->bmd_mode,
