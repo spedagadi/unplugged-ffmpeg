@@ -792,7 +792,10 @@ HRESULT decklink_input_callback::VideoInputFrameArrived(
     if (ctx->audio_pts_source == PTS_SRC_ABS_WALLCLOCK || ctx->video_pts_source == PTS_SRC_ABS_WALLCLOCK)
         abs_wallclock = av_gettime();
     video_pkt_pts = get_pkt_pts(videoFrame, audioFrame, wallclock, abs_wallclock, ctx->video_pts_source, ctx->video_st->time_base, &initial_video_pts, cctx->copyts);
-    audio_pkt_pts = get_pkt_pts(videoFrame, audioFrame, wallclock, abs_wallclock, ctx->audio_pts_source, ctx->audio_st->time_base, &initial_audio_pts, cctx->copyts);
+    // audio_st is NULL when no_audio=1 — guard the audio PTS computation and
+    // the subsequent audio frame path on it (deref here crashed find_stream_info).
+    if (ctx->audio_st)
+        audio_pkt_pts = get_pkt_pts(videoFrame, audioFrame, wallclock, abs_wallclock, ctx->audio_pts_source, ctx->audio_st->time_base, &initial_audio_pts, cctx->copyts);
 
     // Handle Video Frame
     if (videoFrame) {

@@ -63,8 +63,15 @@ static IDeckLinkIterator *decklink_create_iterator(AVFormatContext *avctx)
     IDeckLinkIterator *iter;
 
 #ifdef _WIN32
-    if (CoInitialize(NULL) < 0) {
-        av_log(avctx, AV_LOG_ERROR, "COM initialization failed.\n");
+    // Initialize COM as MTA. CoInitialize(NULL) requests STA and FAILS with
+    // RPC_E_CHANGED_MODE if the calling thread is already MTA-initialized
+    // (e.g. the DirectShow graph's thread that drives s3_shell's decklink
+    // capture). CoInitializeEx(COINIT_MULTITHREADED) succeeds (S_OK/S_FALSE)
+    // both on fresh threads and on already-MTA threads, and tolerates a
+    // changed-mode return when the thread is STA.
+    HRESULT hr_com = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+    if (hr_com != S_OK && hr_com != S_FALSE && hr_com != RPC_E_CHANGED_MODE) {
+        av_log(avctx, AV_LOG_ERROR, "COM initialization failed. hr=0x%08lx\n", (unsigned long)hr_com);
         return NULL;
     }
 
