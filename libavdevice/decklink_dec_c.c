@@ -98,6 +98,7 @@ static const AVOption options[] = {
     { "abs_wallclock", NULL,                                          0,  AV_OPT_TYPE_CONST, { .i64 = PTS_SRC_ABS_WALLCLOCK}, 0, 0, DEC, .unit = "pts_source"},
     { "draw_bars",     "use option signal_loss_action instead" , OFFSET(draw_bars),    AV_OPT_TYPE_BOOL,  { .i64 = 1}, 0, 1, DEC | AV_OPT_FLAG_DEPRECATED },
     { "queue_size",    "input queue buffer size",   OFFSET(queue_size),   AV_OPT_TYPE_INT64, { .i64 = (1024 * 1024 * 1024)}, 0, INT64_MAX, DEC },
+    { "live_frames",   "keep the read queue this many frames from live (discard older aged frames at dequeue; 0 = off)", OFFSET(live_frames), AV_OPT_TYPE_INT, { .i64 = 0 }, 0, 64, DEC },
     { "audio_depth",   "audio bitdepth (16 or 32)", OFFSET(audio_depth),  AV_OPT_TYPE_INT,   { .i64 = 16}, 16, 32, DEC },
     { "decklink_copyts", "copy timestamps, do not remove the initial offset", OFFSET(copyts), AV_OPT_TYPE_BOOL, { .i64 = 0 }, 0, 1, DEC },
     { "timestamp_align", "capture start time alignment (in seconds)", OFFSET(timestamp_align), AV_OPT_TYPE_DURATION, { .i64 = 0 }, 0, INT_MAX, DEC },

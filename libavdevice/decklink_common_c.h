@@ -76,6 +76,7 @@ struct decklink_cctx {
     int wait_for_tc;
     int no_audio;
     DecklinkSignalLossAction signal_loss_action;
+    int live_frames;
 };
 
 #endif /* AVDEVICE_DECKLINK_COMMON_C_H */

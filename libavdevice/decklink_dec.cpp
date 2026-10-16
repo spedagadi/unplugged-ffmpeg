@@ -1372,6 +1372,13 @@ av_cold int ff_decklink_read_header(AVFormatContext *avctx)
     }
 
     ff_decklink_packet_queue_init(avctx, &ctx->queue, cctx->queue_size);
+    ctx->live_frames = cctx->live_frames;
+    ctx->live_drops = 0;
+    if (ctx->live_frames > 0) {
+        // [decklink] traces go to process-stderr, which s3_shell redirects into
+        // s3_shell_diag.log — HTPC verification that (a) is actually on.
+        fprintf(stderr, "[decklink] live_frames mode ENABLED: keep %d frame(s) from live\n", ctx->live_frames);
+    }
 
     if (ctx->dli->StartStreams() != S_OK) {
         av_log(avctx, AV_LOG_ERROR, "Cannot start input stream\n");
@@ -1391,6 +1398,35 @@ int ff_decklink_read_packet(AVFormatContext *avctx, AVPacket *pkt)
 {
     struct decklink_cctx *cctx = (struct decklink_cctx *)avctx->priv_data;
     struct decklink_ctx *ctx = (struct decklink_ctx *)cctx->ctx;
+
+    if (ctx->live_frames > 0) {
+        // HTPC low-latency: the queue accumulates aged frames while the graph
+        // is being constructed/connected (and drops the NEWEST when full, so
+        // the backlog can never roll forward on its own). Presenting from the
+        // OLDEST leaves video pinned ~0.5-1 s behind the AVR's direct audio.
+        // Discard the aged head here so the first delivered frame is within
+        // 'live_frames' of the newest — the connection is untouched, only
+        // stale frames expire (jump-to-live).
+        AVPacket tmp;
+        int dropped = 0;
+        while (ff_decklink_packet_queue_count(&ctx->queue) > (unsigned long)ctx->live_frames) {
+            if (ff_decklink_packet_queue_get(&ctx->queue, &tmp, 0) > 0) {
+                av_packet_unref(&tmp);
+                dropped++;
+            } else {
+                break;
+            }
+        }
+        if (dropped > 0) {
+            ctx->live_drops += dropped;
+            // [decklink] traces go to process-stderr, which s3_shell redirects
+            // into s3_shell_diag.log — HTPC verification for (a) activation and
+            // (b) how many stale frames were discarded (queue depth now).
+            fprintf(stderr, "[decklink] live: dropped %d aged frame(s) (total %lld, queue now %llu)\n",
+                    dropped, (long long)ctx->live_drops,
+                    ff_decklink_packet_queue_count(&ctx->queue));
+        }
+    }
 
     ff_decklink_packet_queue_get(&ctx->queue, pkt, 1);
 

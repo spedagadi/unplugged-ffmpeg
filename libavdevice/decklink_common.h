@@ -141,6 +141,13 @@ struct decklink_ctx {
     /* Capture buffer queue */
     DecklinkPacketQueue queue;
 
+    /* HTPC low-latency ingest: keep the queue this many frames from live at
+     * READ time and discard the older (aged) frames. The queue drops the NEWEST
+     * when full, so without this the demuxer is pinned to the oldest startup
+     * backlog forever (~0.5-1s behind the AVR's audio). 0 = off. */
+    int live_frames;
+    int64_t live_drops;    /* HTPC telemetry: total aged frames discarded */
+
     CCFifo cc_fifo;      ///< closed captions
 
     /* Output VANC queue */
@@ -271,6 +278,7 @@ void ff_decklink_packet_queue_init(AVFormatContext *avctx, DecklinkPacketQueue *
 void ff_decklink_packet_queue_flush(DecklinkPacketQueue *q);
 void ff_decklink_packet_queue_end(DecklinkPacketQueue *q);
 unsigned long long ff_decklink_packet_queue_size(DecklinkPacketQueue *q);
+unsigned long long ff_decklink_packet_queue_count(DecklinkPacketQueue *q);
 int ff_decklink_packet_queue_put(DecklinkPacketQueue *q, AVPacket *pkt);
 int ff_decklink_packet_queue_get(DecklinkPacketQueue *q, AVPacket *pkt, int block);
 int64_t ff_decklink_packet_queue_peekpts(DecklinkPacketQueue *q);

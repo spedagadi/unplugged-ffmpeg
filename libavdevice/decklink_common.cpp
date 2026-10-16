@@ -440,6 +440,15 @@ unsigned long long ff_decklink_packet_queue_size(DecklinkPacketQueue *q)
     return size;
 }
 
+unsigned long long ff_decklink_packet_queue_count(DecklinkPacketQueue *q)
+{
+    unsigned long long count;
+    pthread_mutex_lock(&q->mutex);
+    count = q->nb_packets;
+    pthread_mutex_unlock(&q->mutex);
+    return count;
+}
+
 int ff_decklink_packet_queue_put(DecklinkPacketQueue *q, AVPacket *pkt)
 {
     int pkt_size = pkt->size;
